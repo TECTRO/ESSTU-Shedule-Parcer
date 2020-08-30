@@ -176,7 +176,7 @@ namespace SheduleParcer
                 new GroupOfSchedule.Source("https://portal.esstu.ru/bakalavriat/craspisanEdt.htm", NodeType.Teacher)
             });
 
-            //mainGroupContainer.PutToSubgroups(GroupOfSchedule.DefaultFilters);
+            mainGroupContainer.PutToSubgroups(GroupOfSchedule.DefaultFilters);
 
             //var r = string.Join("\n", mainGroupContainer.Schedules?.Select(t => t.Name).Where(t=>!t.ToLower().Contains("фкс")&& !t.ToLower().Contains("вакансия")) ?? new List<string>()); 
             //var r1 = mainGroupContainer["студенты"]["бакалавриат"];

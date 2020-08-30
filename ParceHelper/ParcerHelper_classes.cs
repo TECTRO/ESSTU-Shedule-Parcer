@@ -70,7 +70,7 @@ namespace ParseHelper
 
         public override string ToString()
         {
-            return (LessonType!=LessonType.Default?LessonType.ToString() + '\n' : "") + Subject;
+            return (LessonType!=LessonType.Default?LessonType.ToString() + " \n" : "") + Subject;
         }
         public Node(DayOfWeek day, WorkingTime time, LessonType lType)
         {
@@ -99,7 +99,7 @@ namespace ParseHelper
         public string AuditoryName { get; set; }
         public override string ToString()
         {
-            return base.ToString() + '\n' + ProfessorName + '\n' + AuditoryName ;
+            return base.ToString() + " \n" + ProfessorName + " \n" + AuditoryName ;
         }
         public StNode(DayOfWeek day, WorkingTime time, LessonType lType) : base(day, time, lType) { }
     }
@@ -110,7 +110,7 @@ namespace ParseHelper
 
         public override string ToString()
         {
-            return base.ToString() + '\n' + AuditoryName + '\n' + GroupName;
+            return base.ToString() + " \n" + AuditoryName + " \n" + GroupName;
         }
         public PrepNode(DayOfWeek day, WorkingTime time, LessonType lType) : base(day, time, lType) { }
     }
@@ -121,7 +121,7 @@ namespace ParseHelper
         public string ProfessorName { get; set; }
         public override string ToString()
         {
-            return base.ToString() + '\n' + ProfessorName + '\n' + GroupName;
+            return base.ToString() + " \n" + ProfessorName + " \n" + GroupName;
         }
         public AuditoryNode(DayOfWeek day, WorkingTime time, LessonType lType) : base(day, time, lType) { }
     }
