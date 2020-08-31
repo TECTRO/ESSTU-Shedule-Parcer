@@ -1,8 +1,11 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using System.Threading;
+using Microsoft.Office.Interop.Excel;
 
 // ReSharper disable once CheckNamespace
 namespace ParseHelper
@@ -369,5 +372,92 @@ namespace ParseHelper
     }
 
     /////////////////////////////////////////////////////
+
+    public class ThreadWatcher : IEnumerable<Thread>
+    {
+        private List<Thread> _mainThreads = new List<Thread>();
+
+        public int AllowSessionsCount { get; } = 0;
+        public int ActiveSessionsCount { get; private set; } = 0;
+
+        private object _synchronizationPlug = new object();
+        private void buildSynchronizationContext() 
+        {
+            if (SynchronizationContext.Current == null)
+            {
+                SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
+            }
+        }
+
+        public ThreadWatcher(int allowSessionsCount)
+        {
+            buildSynchronizationContext();
+
+            AllowSessionsCount = allowSessionsCount;
+        }
+
+        public ThreadWatcher()
+        {
+            buildSynchronizationContext();
+            AllowSessionsCount = Environment.ProcessorCount /2;
+        }
+
+        public void Add(Thread th)
+        {
+            Thread sourceThreadHolder = new Thread(arg =>
+            {
+                Thread thisThread = (Thread) arg;
+
+                lock (_synchronizationPlug)
+                {
+                    _mainThreads.Remove(thisThread);
+                }
+
+                th.Start();
+                th.Join();
+
+                lock (_synchronizationPlug)
+                {
+                    ActiveSessionsCount--;
+
+                    if (ActiveSessionsCount < AllowSessionsCount)
+                        for (int i = 0;
+                            i < Math.Min(AllowSessionsCount - ActiveSessionsCount,
+                                _mainThreads.Count(holderThread => holderThread.ThreadState == ThreadState.Unstarted));
+                            i++)
+                        {
+                            ActiveSessionsCount++;
+                            _mainThreads
+                                .FirstOrDefault(holderThread => holderThread.ThreadState == ThreadState.Unstarted)
+                                ?.Start(arg);
+                        }
+                }
+            });
+
+            lock (_synchronizationPlug)
+            {
+                _mainThreads.Add(sourceThreadHolder);
+
+                if (ActiveSessionsCount < AllowSessionsCount)
+                    for (int i = 0;
+                        i < Math.Min
+                        (
+                            AllowSessionsCount - ActiveSessionsCount,
+                            _mainThreads.Count(holderThread => holderThread.ThreadState == ThreadState.Unstarted)
+                        );
+                        i++)
+                    {
+                        ActiveSessionsCount++;
+                        _mainThreads
+                            .FirstOrDefault(holderThread => holderThread.ThreadState == ThreadState.Unstarted)
+                            ?.Start(sourceThreadHolder);
+                    }
+            }
+        }
+
+        public IEnumerator<Thread> GetEnumerator() => _mainThreads.GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => _mainThreads.GetEnumerator();
+    }
+
 
 }

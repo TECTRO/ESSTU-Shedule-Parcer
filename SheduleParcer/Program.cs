@@ -23,6 +23,42 @@ namespace SheduleParcer
         //=================================================
         static void Main(string[] args)
         {
+            ThreadWatcher thWatcher = new ThreadWatcher();
+            object obj = new object();
+            int i = 0;
+            thWatcher.Add(new Thread(() => { Thread.Sleep(10000); lock (obj) { i++; Console.WriteLine($"{i} завершено 1"); } }));
+            thWatcher.Add(new Thread(() => { Thread.Sleep(10000); lock (obj) { i++; Console.WriteLine($"{i} завершено 2"); } }));
+            thWatcher.Add(new Thread(() => { Thread.Sleep(10000); lock (obj) { i++; Console.WriteLine($"{i} завершено 3"); } }));
+            thWatcher.Add(new Thread(() => { Thread.Sleep(10000); lock (obj) { i++; Console.WriteLine($"{i} завершено 4"); } }));
+            thWatcher.Add(new Thread(() => { Thread.Sleep(10000); lock (obj) { i++; Console.WriteLine($"{i} завершено 5"); } }));
+            thWatcher.Add(new Thread(() => { Thread.Sleep(10000); lock (obj) { i++; Console.WriteLine($"{i} завершено 6"); } }));
+            thWatcher.Add(new Thread(() => { Thread.Sleep(10000); lock (obj) { i++; Console.WriteLine($"{i} завершено 7"); } }));
+            thWatcher.Add(new Thread(() => { Thread.Sleep(10000); lock (obj) { i++; Console.WriteLine($"{i} завершено 8"); } }));
+            thWatcher.Add(new Thread(() => { Thread.Sleep(10000); lock (obj) { i++; Console.WriteLine($"{i} завершено 9"); } }));
+            thWatcher.Add(new Thread(() => { Thread.Sleep(10000); lock (obj) { i++; Console.WriteLine($"{i} завершено 10"); } }));
+            thWatcher.Add(new Thread(() => { Thread.Sleep(10000); lock (obj) { i++; Console.WriteLine($"{i} завершено 11"); } }));
+            thWatcher.Add(new Thread(() => { Thread.Sleep(10000); lock (obj) { i++; Console.WriteLine($"{i} завершено 12"); } }));
+            thWatcher.Add(new Thread(() => { Thread.Sleep(10000); lock (obj) { i++; Console.WriteLine($"{i} завершено 13"); } }));
+            thWatcher.Add(new Thread(() => { Thread.Sleep(10000); lock (obj) { i++; Console.WriteLine($"{i} завершено 14"); } }));
+            thWatcher.Add(new Thread(() => { Thread.Sleep(10000); lock (obj) { i++; Console.WriteLine($"{i} завершено 15"); } }));
+            thWatcher.Add(new Thread(() => { Thread.Sleep(10000); lock (obj) { i++; Console.WriteLine($"{i} завершено 16"); } }));
+            thWatcher.Add(new Thread(() => { Thread.Sleep(10000); lock (obj) { i++; Console.WriteLine($"{i} завершено 17"); } }));
+            thWatcher.Add(new Thread(() => { Thread.Sleep(10000); lock (obj) { i++; Console.WriteLine($"{i} завершено 18"); } }));
+            thWatcher.Add(new Thread(() => { Thread.Sleep(10000); lock (obj) { i++; Console.WriteLine($"{i} завершено 19"); } }));
+
+            int oldval = 0;
+            while (true)
+            {
+                var r = thWatcher.ActiveSessionsCount;
+                if(r != oldval)
+                    Console.WriteLine($"{thWatcher.ActiveSessionsCount} {thWatcher.AllowSessionsCount}");
+                oldval = r;
+                //Thread.Sleep(500);
+
+                //Console.CursorTop = 0;
+            }
+
+
             ParserHelper parser = ParserHelper.InitClass();
 
             //var res = parser.SelectTables(
