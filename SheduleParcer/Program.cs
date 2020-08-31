@@ -78,7 +78,7 @@ namespace SheduleParcer
             //}
             // !!!THREADWATCHER DEBUG!!!
 
-            ParserHelper parser = ParserHelper.InitClass();
+            //ParserHelper parser = new ParserHelper();
 
             //var res = parser.SelectTables(
             //    parser.FillTable(parser.GetLinksRecursive("https://portal.esstu.ru/bakalavriat/raspisan.htm"), NodeType.Student), 
@@ -103,12 +103,12 @@ namespace SheduleParcer
 
             //var ss = ress.Select(t => t.GetAsTables().ToList()).ToList();
 
-            List<string> resultlist = new List<string>();
+            //List<string> resultlist = new List<string>();
 
-            if (SynchronizationContext.Current == null)
-            {
-                SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
-            }
+            //if (SynchronizationContext.Current == null)
+            //{
+            //    SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
+            //}
 
             //parser.GetLinksRecursiveAsync("https://portal.esstu.ru/spezialitet/raspisan.htm", resultlist);
 
@@ -120,13 +120,13 @@ namespace SheduleParcer
             //    MessageBox.Show("добавлена запись "+ reslist[e.NewStartingIndex].Name);
             //};
 
-            int exccount = 0;
-            Exception lsstException = null;
-            parser.ExceptionEvent += e =>
-            {
-                exccount++;
-                lsstException = e;
-            };
+            //int exccount = 0;
+            //Exception lsstException = null;
+            //parser.ExceptionEvent += e =>
+            //{
+            //    exccount++;
+            //    lsstException = e;
+            //};
 
             //var res = reslist.Union(parser.FillTableRecurcieve(new[]
             //{
@@ -205,15 +205,8 @@ namespace SheduleParcer
              //        }
              //    }
              //}
-
-             var xheck = res1.Select(t=>t.Name).Distinct().ToList();
-            xheck.Sort();
-
-            var ffgf = parser.RemoveRepeats(res1).Select(t => t.Name).ToList();
-            ffgf.Sort();
-
-
-            var filter = GroupOfSchedule.DefaultFilters["студенты"]["Бакалавриат"];
+             
+           //var filter = GroupOfSchedule.DefaultFilters["студенты"]["Бакалавриат"];
 
             GroupOfSchedule mainGroupContainer = new GroupOfSchedule();
 
@@ -223,7 +216,7 @@ namespace SheduleParcer
                 new GroupOfSchedule.Source("https://portal.esstu.ru/bakalavriat/raspisan.htm", NodeType.Student)
             });
 
-            mainGroupContainer.LoadAsAuditoriums(mainGroupContainer.Schedules);
+            mainGroupContainer.ToAuditoriums(mainGroupContainer.Schedules);
 
             mainGroupContainer.LoadSchedules(new[]
             {
@@ -235,13 +228,14 @@ namespace SheduleParcer
 
             //var r = string.Join("\n", mainGroupContainer.Schedules?.Select(t => t.Name).Where(t=>!t.ToLower().Contains("фкс")&& !t.ToLower().Contains("вакансия")) ?? new List<string>()); 
             //var r1 = mainGroupContainer["студенты"]["бакалавриат"];
-            parser.ExcelExport(mainGroupContainer.Schedules,Directory.GetCurrentDirectory()+"\\ExcelTables");
+            //parser.ExcelExport(mainGroupContainer.Schedules,Directory.GetCurrentDirectory()+"\\ExcelTables");
 
-            if (exccount!=0) MessageBox.Show(lsstException?.Message, "Возникла ошибка загрузки ("+ exccount +")", MessageBoxButtons.OK);
+            //if (exccount!=0) MessageBox.Show(lsstException?.Message, "Возникла ошибка загрузки ("+ exccount +")", MessageBoxButtons.OK);
             //do
             //{
             //    Console.ReadKey();
             //} while (true);
+            ThreadManager.DebuggerOff = true;
         }
     }
 }

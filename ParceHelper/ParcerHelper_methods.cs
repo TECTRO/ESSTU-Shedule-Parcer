@@ -29,22 +29,15 @@ namespace ParseHelper
         public static readonly Regex Auditory = new Regex(@"а\.(?<audit>\d*-?\w*-?\w*)"); //@"\d?\d?-?\d{2}?\d?-?\d?"
         public static readonly Regex ProfessorFio = new Regex(@"\w+\s\w[\.\,]\s?\w[\.\,]?");
         public static readonly Regex Group = new Regex(@"(?<group>\w*\s?\d\d\d?\d?/?\d*,?-?\d*)");
-        ///////////////////////////////////////////////////////////////////// 
-        private WebClient Client { get; }
+        /////////////////////////////////////////////////////////////////////
 
-        private HttpClient HClient { get; }
-        private ParserHelper()
-        {
-            HClient= new HttpClient(new HttpClientHandler{ MaxConnectionsPerServer = 10000, MaxRequestContentBufferSize = 1000000000});
-            //ServicePointManager.DefaultConnectionLimit = 1000;
-            Client = new WebClient();
-        }
 
-        private static ParserHelper _initializationUnit;
-        public static ParserHelper InitClass()
-        {
-            return _initializationUnit ?? (_initializationUnit = new ParserHelper());
-        }
+        ///synchronization plug for async recursive methods
+        private readonly object _synchronizationPlug = new object();
+        ///
+        
+        private ThreadManager ThManager { get; } 
+        public ParserHelper(ThreadManager manager) => ThManager = manager;
 
         private static TextInfo _info;
         public string CorrectRegister(string source)
@@ -53,80 +46,54 @@ namespace ParseHelper
             
             return _info.ToTitleCase(source.ToLower());
         }
-        public IEnumerable<string> GetLinks(string website)
-        {
-            if (string.IsNullOrEmpty(website)) return null;
-
-            var mainData = Client.DownloadString(website);
-
-            Regex myRegex = new Regex(@"href=""(?<address>\S+\.\S+)""", RegexOptions.IgnoreCase);
-
-            return myRegex.Matches(mainData).Cast<Match>().Select(t => t.Groups["address"].Value);
-        }
-        public async Task<IEnumerable<string>> GetLinksAsyncTask(string website)
-        {
-            if (string.IsNullOrEmpty(website)) return null;
-
-            var mainData = await Client.DownloadStringTaskAsync(website);
-
-            Regex myRegex = new Regex(@"href=""(?<address>\S+\.\S+)""", RegexOptions.IgnoreCase);
-
-            return myRegex.Matches(mainData).Cast<Match>().Select(t => t.Groups["address"].Value);
-        }
-        
-        [Obsolete(@"Не рекомендую использовать")]
-        public void GetLinksAsync(string website, ICollection<string> result)
-        {
-            Regex myRegex = new Regex(@"href=""(?<address>\S+\.\S+)""", RegexOptions.IgnoreCase);
-
-            using (WebClient client = new WebClient())
-            {
-                client.DownloadStringCompleted += (sender, e) =>
-                {
-                    var tempList = myRegex.Matches(e.Result).Cast<Match>().Select(t => t.Groups["address"].Value);
-
-                    foreach (var cur in tempList)
-                        result.Add(cur);
-                };
-                client.DownloadStringAsync(new Uri(website));
-            }
-        }
 
         public IEnumerable<string> GetLinksRecursive(string website)
         {
-            string mask = WebLinkMask.Match(website).Groups["mask"].Value + '/'; //new Regex(@"(?<mask>\S+)/\S+\.\S+", RegexOptions.IgnoreCase)
+            string mask = WebLinkMask.Match(website).Groups["mask"].Value + '/'; 
 
-            string mainData = Client.DownloadString(website);
-
-            //Regex myRegex = new Regex(@"href=""(?<address>\S+\.\S+)"".*<FONT.+>(?<linkname>.+)</FONT>", RegexOptions.IgnoreCase);
-
-            List<string> results = new List<string>();
-            
-            var filteredMatches = WebLinkAddress.Matches(mainData).Cast<Match>()
-                .Where(t => !t.Groups["address"].Value.Contains("http") && t.Groups["linkname"].Value.Any(c => char.IsDigit(c) || char.IsLetter(c)))
-                .Select(t => t.Groups["address"].Value)
-                .Distinct()
-                .ToList();
-            
-            if (!filteredMatches.Any())
+            using (WebClient client = new WebClient())
             {
-                filteredMatches = WebLinkAddressShort.Matches(mainData).Cast<Match>()
-                    .Where(t => !t.Groups["address"].Value.Contains("http"))
+                string mainData;
+
+                try
+                {
+                    mainData = client.DownloadString(website);
+                }
+                catch (Exception e)
+                {
+                    ExceptionEvent?.Invoke(e);
+                    return null;
+                }
+
+                List<string> results = new List<string>();
+
+                var filteredMatches = WebLinkAddress.Matches(mainData).Cast<Match>()
+                    .Where(t => !t.Groups["address"].Value.Contains("http") &&
+                                t.Groups["linkname"].Value.Any(c => char.IsDigit(c) || char.IsLetter(c)))
                     .Select(t => t.Groups["address"].Value)
                     .Distinct()
                     .ToList();
-            }
 
-            if (filteredMatches.Any())
-            {
-                foreach (var match in filteredMatches)
+                if (!filteredMatches.Any())
                 {
-                    results.AddRange(GetLinksRecursive(mask + match));
+                    filteredMatches = WebLinkAddressShort.Matches(mainData).Cast<Match>()
+                        .Where(t => !t.Groups["address"].Value.Contains("http"))
+                        .Select(t => t.Groups["address"].Value)
+                        .Distinct()
+                        .ToList();
                 }
-            }
-            else results.Add(website);
 
-            return results;
+                if (filteredMatches.Any())
+                {
+                    foreach (var match in filteredMatches)
+                    {
+                        results.AddRange(GetLinksRecursive(mask + match));
+                    }
+                }
+                else results.Add(website);
+
+                return results;
+            }
         }
 
         public delegate void ExceptionDelegate(Exception exc);
@@ -171,7 +138,7 @@ namespace ParseHelper
 
             return converted;
         }
-        private void GetLinksRecursiveAsync(string website, ICollection<string> result, GerLinksDelegate inputFunctionDelegate, SynchronizationContext context, bool waitForFinish)
+        private void GetLinksRecursiveAsync(string website, ICollection<string> result, GerLinksDelegate inputFunctionDelegate)
         {
             string mask = WebLinkMask.Match(website).Groups["mask"].Value + '/';
 
@@ -207,106 +174,54 @@ namespace ParseHelper
 
                 if (filteredMatches.Any())
                 {
-                    List<Thread> threads = new List<Thread>();
                     foreach (var match in filteredMatches)
                     {
-                        Thread cur = new Thread(() =>
+                        ThManager.Add(
+                            new Thread(() =>
                         {
-                            GetLinksRecursiveAsync(mask + match, result, inputFunctionDelegate, context, waitForFinish);
+                            GetLinksRecursiveAsync(mask + match, result, inputFunctionDelegate);
 
-                        });
-                        cur.Start();
-                        threads.Add(cur);
+                        }));
                     }
-
-                    if (waitForFinish)
-                        foreach (var thread in threads.Where(thread => thread.IsAlive))
-                            thread.Join();
                 }
                 else
                 {
-                    if (context != null)
-                        context.Send(f => { result?.Add(website); }, null);
-                    else
+                    lock (_synchronizationPlug)
+                    {
                         result?.Add(website);
+                    }
 
                     inputFunctionDelegate?.Invoke(website);
-
-
-                    ////////////////////////////
-                    //filteredMatches.Clear();
-
                 }
             }
         }
 
         public void GetLinksRecursiveAsync(string website, ICollection<string> result)
         {
-            GetLinksRecursiveAsync(website, result, false);
-        }
-        public void GetLinksRecursiveAsync(string website, ICollection<string> result, bool waitForFinish)
-        {
-            GetLinksRecursiveAsync(website, result, null, SynchronizationContext.Current, waitForFinish);
-        }
-        public void GetLinksRecursiveAsync(string website, ICollection<string> result, SynchronizationContext current)
-        {
-            GetLinksRecursiveAsync(website, result, null, current, false);
-        }
-        public void GetLinksRecursiveAsync(string website, ICollection<string> result, SynchronizationContext current, bool waitForFinish)
-        {
-            GetLinksRecursiveAsync(website, result, null, current, waitForFinish);
+            GetLinksRecursiveAsync(website, result, null);
         }
 
         public void FillTableRecurcieveAsync(string website, NodeType type, ICollection<Schedule> result)
         {
-            FillTableRecurcieveAsync(website, type, result, SynchronizationContext.Current, false);
-        }
-        public void FillTableRecurcieveAsync(string website, NodeType type, ICollection<Schedule> result, bool waitForFinish)
-        {
-            FillTableRecurcieveAsync(website, type, result, SynchronizationContext.Current, waitForFinish);
-        }
-        public void FillTableRecurcieveAsync(string website, NodeType type, ICollection<Schedule> result, SynchronizationContext current)
-        {
-            FillTableRecurcieveAsync(website, type, result, current, false);
-        }
-        public void FillTableRecurcieveAsync(string website, NodeType type, ICollection<Schedule> result, SynchronizationContext current, bool waitForFinish)
-        {
             GetLinksRecursiveAsync(website, null, e =>
              {
-                 FillTableAsync(e, type, result, current, waitForFinish);
-             }, current,waitForFinish);
+                 FillTableAsync(e, type, result);
+             });
         }
 
         public void FillTableRecurcieveAsync(IEnumerable<string> websites, NodeType type, ICollection<Schedule> result)
         {
-            FillTableRecurcieveAsync(websites, type, result, SynchronizationContext.Current, false);
-        }
-        public void FillTableRecurcieveAsync(IEnumerable<string> websites, NodeType type, ICollection<Schedule> result, bool waitForFinish)
-        {
-            FillTableRecurcieveAsync(websites, type, result, SynchronizationContext.Current, waitForFinish);
-        }
-        public void FillTableRecurcieveAsync(IEnumerable<string> websites, NodeType type, ICollection<Schedule> result, SynchronizationContext current)
-        {
-            FillTableRecurcieveAsync(websites, type, result, current, false);
-        }
-        public void FillTableRecurcieveAsync(IEnumerable<string> websites, NodeType type, ICollection<Schedule> result, SynchronizationContext current, bool waitForFinish)
-        {
-            List<Thread> threads = new List<Thread>();
             foreach (var website in websites)
             {
                 var curThread = new Thread(() => {
                     GetLinksRecursiveAsync(website, null, e =>
                     {
-                        FillTableAsync(e, type, result, current, waitForFinish);
-                    }, current, waitForFinish);
+                        FillTableAsync(e, type, result);
+                    });
                 });
-                curThread.Start();
-                threads.Add(curThread);
+                
+                ThManager.Add(curThread);
             }
-
-            if(waitForFinish)
-                foreach (var thread in threads)
-                    if(thread.IsAlive) thread.Join();
         }
         public IEnumerable<Schedule> SelectTables(IEnumerable<Schedule> tables, Regex regExFilter, SearchLevel level)
         {
@@ -423,7 +338,7 @@ namespace ParseHelper
         }
         public IEnumerable<Schedule> FillTable(IEnumerable<string> tableLinks, NodeType type)
         {
-            List<Schedule> result = new List<Schedule>();
+            var result = new List<Schedule>();
 
             foreach (var link in tableLinks)
                 result.AddRange(FillTable(link, type));
@@ -432,19 +347,24 @@ namespace ParseHelper
         }
         public IEnumerable<Schedule> FillTable(string tableLink, NodeType type)
         {
-            string mainData;
-            try
+            using (WebClient client = new WebClient())
             {
-                mainData = Client.DownloadString(tableLink);
-            }
-            catch
-            {
-                return new List<Schedule>();
-            }
+                string mainData;
 
-            return FillTable(type,mainData);
+                try
+                {
+                    mainData = client.DownloadString(tableLink);
+                }
+                catch
+                {
+                    return new List<Schedule>();
+                }
+
+                return FillTable(type, mainData);
+            }
         }
-        private void FillTableAsync(string tableLink, NodeType type, ICollection<Schedule> result, SynchronizationContext context, bool waitForFinish)
+
+        private void FillTableAsync(string tableLink, NodeType type, ICollection<Schedule> result)
         {
             Thread local = new Thread(() =>
             {
@@ -454,11 +374,11 @@ namespace ParseHelper
                     {
                         var preResult = FillTable(type, client.DownloadString(tableLink));
 
-                        context?.Send(t =>
+                        lock (_synchronizationPlug)
                         {
                             foreach (var schedule in preResult)
                                 result.Add(schedule);
-                        }, null);
+                        }
                     }
                     catch (Exception e)
                     {
@@ -466,10 +386,25 @@ namespace ParseHelper
                     }
                 }
             });
-            local.Start();
-            if (waitForFinish) local.Join();
+            ThManager.Add(local);
         }
 
+        public delegate void WaiterDelegate();
+        public void AsyncWaiter(WaiterDelegate waiterFunc)
+        {
+            bool isFinished = false;
+            void FinishMarker()
+            {
+                isFinished = true;
+            }
+            ThManager.ThreadsEndedEvent += FinishMarker;
+
+            waiterFunc?.Invoke();
+
+            while (!isFinished) { }
+            ThManager.ThreadsEndedEvent -= FinishMarker;
+
+        }
         private IEnumerable<string> MySplit(string value,string splitter)
         {
             List<string> result = new List<string>();

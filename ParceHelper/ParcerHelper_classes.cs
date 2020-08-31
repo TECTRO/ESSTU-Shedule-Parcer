@@ -165,15 +165,21 @@ namespace ParseHelper
             public NodeType AssignType { get; }
         }
 
+        private readonly ThreadManager _thManager;
+        private readonly ParserHelper _helper;
+
+
         public GroupOfSchedule(IEnumerable<Schedule> schedules)
         {
             Schedules = schedules.ToList();
-            //Subgroups = new List<GroupOfSchedule>();
+
+            _thManager = new ThreadManager();
+            _helper = new ParserHelper(_thManager);
         }
         public GroupOfSchedule()
         {
-            //Schedules = new List<Schedule>();
-            //Subgroups = new List<GroupOfSchedule>();
+            _thManager = new ThreadManager();
+            _helper = new ParserHelper(_thManager);
         }
         public string GroupName { get; set; }
         public List<Schedule> Schedules { get; private set; }
@@ -220,44 +226,65 @@ namespace ParseHelper
                     PutToSubgroups(group, filtersSubFilter);
                 }
         }
+
+        //public delegate void WaiterDelegate();
+        //private void AsyncWaiter(WaiterDelegate waiterFunc)
+        //{
+        //    bool isFinished = false;
+        //    void FinishMarker()
+        //    {
+        //        isFinished = true;
+        //    }
+        //    _thManager.ThreadsEndedEvent += FinishMarker;
+            
+        //    waiterFunc?.Invoke();
+            
+        //    while (!isFinished) { }
+        //    _thManager.ThreadsEndedEvent -= FinishMarker;
+
+        //}
         public void LoadSchedules(IEnumerable<Source> sources)
         {
             var loadedSchedules = new List<Schedule>();
-            ParserHelper current = ParserHelper.InitClass();
 
-            foreach (var source in sources)
+            _helper.AsyncWaiter(() =>
             {
-                loadedSchedules.AddRange(current.FillTableRecurcieveAsyncAndWait(source.WebLink,source.LinkType));
-            }
+                foreach (var source in sources)
+                {
+                    _helper.FillTableRecurcieveAsync(source.WebLink, source.LinkType, loadedSchedules);
+                }
+            });
 
-            if(Schedules == null)Schedules = new List<Schedule>();
-            Schedules.AddRange(current.RemoveRepeats(loadedSchedules));
+            if (Schedules == null)Schedules = new List<Schedule>();
+            Schedules.AddRange(_helper.RemoveRepeats(loadedSchedules));
         }
 
         public void LoadAsAuditoriums(IEnumerable<Source> sources)
         {
             var loadedSchedules = new List<Schedule>();
-            ParserHelper current = ParserHelper.InitClass();
-
             foreach (var source in sources)
             {
-                loadedSchedules.AddRange(current.FillTableRecurcieveAsyncAndWait(source.WebLink, source.LinkType));
+                var res = new List<Schedule>();
+                _helper.AsyncWaiter(() => { _helper.FillTableRecurcieveAsync(source.WebLink, source.LinkType, res); });
+                loadedSchedules.AddRange(res);
             }
+            //foreach (var source in sources)
+            //{
+            //    loadedSchedules.AddRange(_helper.FillTableRecurcieveAsyncAndWait(source.WebLink, source.LinkType));
+            //}
 
             if (Schedules == null) Schedules = new List<Schedule>();
-            Schedules.AddRange(current.ConvertToAuditorySchedule(current.RemoveRepeats(loadedSchedules)));
+            Schedules.AddRange(_helper.ConvertToAuditorySchedule(_helper.RemoveRepeats(loadedSchedules)));
         }
-        public void LoadAsAuditoriums(IEnumerable<Schedule> sources)
+        public void ToAuditoriums(IEnumerable<Schedule> sources)
         {
-            ParserHelper current = ParserHelper.InitClass();
-
             if (Schedules == null) Schedules = new List<Schedule>();
-            Schedules.AddRange(current.ConvertToAuditorySchedule(sources));
+            Schedules.AddRange(_helper.ConvertToAuditorySchedule(sources));
         }
 
         public ParserHelper GetHelper()
         {
-            return ParserHelper.InitClass();
+            return _helper;
         }
         /// <summary>
         /// Work In Progress
@@ -373,32 +400,51 @@ namespace ParseHelper
 
     /////////////////////////////////////////////////////
 
-    public class ThreadWatcher : IEnumerable<Thread>
+    public class ThreadManager : IEnumerable<Thread>
     {
         private readonly List<Thread> _mainThreads = new List<Thread>();
-        public int AllowSessionsCount { get; } = 0;
-        public int ActiveSessionsCount { get; private set; } = 0;
+        public int AllowSessionsCount { get; }
+        public int ActiveSessionsCount { get; private set; }
 
         private readonly object _synchronizationPlug = new object();
-        private void buildSynchronizationContext() 
+
+        public delegate void ThreadsEnded();
+
+        public event ThreadsEnded ThreadsEndedEvent;
+
+
+        /// <summary>
+        ///DEBUG
+        /// 
+        public static bool DebuggerOff = false;
+        void StartDebugger()
         {
-            if (SynchronizationContext.Current == null)
-            {
-                SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
-            }
+            new Thread(() =>
+                {
+                    int oldval = 0;
+                    while (!DebuggerOff)
+                    {
+                        var r = ActiveSessionsCount;
+                        if (r != oldval)
+                        {
+                            Console.WriteLine(
+                                $"active sessions: {ActiveSessionsCount};\nmax sessions: {AllowSessionsCount}; \nwaiting sessions: {_mainThreads.Count}.\n");
+                        }
+
+                        oldval = r;
+
+                    }
+                }
+            ).Start();
         }
+        /// </summary>
 
-        public ThreadWatcher(int allowSessionsCount)
+        public ThreadManager(int allowSessionsCount) => AllowSessionsCount = allowSessionsCount;
+
+        public ThreadManager()
         {
-            buildSynchronizationContext();
-
-            AllowSessionsCount = allowSessionsCount;
-        }
-
-        public ThreadWatcher()
-        {
-            buildSynchronizationContext();
             AllowSessionsCount = Environment.ProcessorCount /2;
+            StartDebugger();
         }
 
         public void Add(Thread th)
@@ -423,6 +469,9 @@ namespace ParseHelper
                             firstUnstatedThread.Start();
                         }
                     }
+
+                    if(_mainThreads.Count == 0 && ActiveSessionsCount == 0)
+                        ThreadsEndedEvent?.Invoke();
                 }
             });
 

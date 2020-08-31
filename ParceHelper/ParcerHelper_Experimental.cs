@@ -34,132 +34,42 @@ namespace ParseHelper
     }
     public partial class ParserHelper
     {
-        public async Task<IEnumerable<string>> GetLinksRecursiveAsyncTask(string website)
-        {
-            List<string> result = new List<string>();
-
-                string mask = WebLinkMask.Match(website).Groups["mask"].Value + '/';
-
-                string mainData;
-
-                try
-                {
-                    mainData = await HClient.GetStringAsync(website);
-                }
-                catch (Exception e)
-                {
-                    ExceptionEvent?.Invoke(e);
-                    return new List<string>();
-                }
-
-                var filteredMatches = WebLinkAddress.Matches(mainData).Cast<Match>()
-                    .Where(t => !t.Groups["address"].Value.Contains("http") && t.Groups["linkname"].Value
-                                    .Any(c => char.IsDigit(c) || char.IsLetter(c)))
-                    .Select(t => t.Groups["address"].Value)
-                    .Distinct()
-                    .ToList();
-
-                if (!filteredMatches.Any())
-                {
-                    filteredMatches = WebLinkAddressShort.Matches(mainData).Cast<Match>()
-                        .Where(t => !t.Groups["address"].Value.Contains("http"))
-                        .Select(t => t.Groups["address"].Value)
-                        .Distinct()
-                        .ToList();
-                }
-
-                if (filteredMatches.Any())
-                {
-                    List<Task<IEnumerable<string>>> threads = new List<Task<IEnumerable<string>>>();
-                    foreach (var match in filteredMatches)
-                    {
-                        threads.Add(GetLinksRecursiveAsyncTask(mask + match));
-                    }
-
-                    var tempResults = await Task.WhenAll(threads.ToArray());
-
-                    foreach (var tempResult in tempResults)
-                        result.AddRange(tempResult);
-
-                    return result;
-                }
-
-                result.Add(website);
-                return result;
-
-
-                ////////////////////////////
-                //filteredMatches.Clear();
-
-        }
-
-        public async Task<IEnumerable<Schedule>> FillTableRecurcieveAsyncTask(string website, NodeType nType)
-        {
-            var webLinks = await GetLinksRecursiveAsyncTask(website);
-            List<Task<IEnumerable<Schedule>>> threads = new List<Task<IEnumerable<Schedule>>>();
-            foreach (var webLink in webLinks)
-            {
-                threads.Add(Task.Factory.StartNew(async () =>
-                {
-                    string source;
-                    try
-                    {
-                        source = Encoding.Default.GetString(await HClient.GetByteArrayAsync(webLink));
-                    }
-                    catch (Exception e)
-                    {
-                        ExceptionEvent?.Invoke(e);
-                        return new List<Schedule>();
-                    }
-                    return FillTable(nType, source);
-                }).Unwrap());
-            }
-
-            List<Schedule> result = new List<Schedule>();
-
-            var tempResults = await Task.WhenAll(threads.ToArray());
-
-            foreach (var tempResult in tempResults)
-                result.AddRange(tempResult);
-
-            return result;
-        }
-        /// <summary>
-        ///  Для упрощенной загрузки таблиц расписания рекомендуется использовать данный метод (самый жесткий и быстрый способ)
-        /// </summary>
-        /// <param name="webLink">
-        /// ссылка с сайта portal.ESSTU.ru
-        /// </param>
-        /// <param name="nType">
-        /// тип в который будет конвертированы записи таблиц
-        /// </param>
-        /// <returns>
-        /// возвращает список классов расписаний
-        /// </returns>
-        public IEnumerable<Schedule> FillTableRecurcieveAsyncAndWait(string webLink, NodeType nType)
-        {
-            List<Schedule> result = new List<Schedule>();
-            FillTableRecurcieveAsync(webLink, nType, result, SynchronizationContext.Current, true);
-            return result;
-        }
-        /// <summary>
-        /// Для упрощенной загрузки таблиц расписания рекомендуется использовать данный метод (самый жесткий и быстрый способ)
-        /// </summary>
-        /// <param name="webLinks">
-        /// список ссылок с сайта portal.ESSTU.ru 
-        /// </param>
-        /// <param name="nType">
-        /// тип в который будет конвертированы записи таблиц
-        /// </param>
-        /// <returns>
-        /// возвращает список классов расписаний
-        /// </returns>
-        public IEnumerable<Schedule> FillTableRecurcieveAsyncAndWait(IEnumerable<string> webLinks, NodeType nType)
-        {
-            List<Schedule> result = new List<Schedule>();
-            FillTableRecurcieveAsync(webLinks, nType, result, SynchronizationContext.Current, true);
-            return result;
-        }
+        ///// <summary>
+        /////  Для упрощенной загрузки таблиц расписания рекомендуется использовать данный метод (самый жесткий и быстрый способ)
+        ///// </summary>
+        ///// <param name="webLink">
+        ///// ссылка с сайта portal.ESSTU.ru
+        ///// </param>
+        ///// <param name="nType">
+        ///// тип в который будет конвертированы записи таблиц
+        ///// </param>
+        ///// <returns>
+        ///// возвращает список классов расписаний
+        ///// </returns>
+        //public IEnumerable<Schedule> FillTableRecurcieveAsyncAndWait(string webLink, NodeType nType)
+        //{
+        //    List<Schedule> result = new List<Schedule>();
+        //    FillTableRecurcieveAsync(webLink, nType, result);
+        //    return result;
+        //}
+        ///// <summary>
+        ///// Для упрощенной загрузки таблиц расписания рекомендуется использовать данный метод (самый жесткий и быстрый способ)
+        ///// </summary>
+        ///// <param name="webLinks">
+        ///// список ссылок с сайта portal.ESSTU.ru 
+        ///// </param>
+        ///// <param name="nType">
+        ///// тип в который будет конвертированы записи таблиц
+        ///// </param>
+        ///// <returns>
+        ///// возвращает список классов расписаний
+        ///// </returns>
+        //public IEnumerable<Schedule> FillTableRecurcieveAsyncAndWait(IEnumerable<string> webLinks, NodeType nType)
+        //{
+        //    List<Schedule> result = new List<Schedule>();
+        //    FillTableRecurcieveAsync(webLinks, nType, result);
+        //    return result;
+        //}
 
         public void ExcelExport(IEnumerable<Schedule> savingSchedules, string path)
         {
