@@ -375,12 +375,11 @@ namespace ParseHelper
 
     public class ThreadWatcher : IEnumerable<Thread>
     {
-        private List<Thread> _mainThreads = new List<Thread>();
-
+        private readonly List<Thread> _mainThreads = new List<Thread>();
         public int AllowSessionsCount { get; } = 0;
         public int ActiveSessionsCount { get; private set; } = 0;
 
-        private object _synchronizationPlug = new object();
+        private readonly object _synchronizationPlug = new object();
         private void buildSynchronizationContext() 
         {
             if (SynchronizationContext.Current == null)
@@ -404,15 +403,8 @@ namespace ParseHelper
 
         public void Add(Thread th)
         {
-            Thread sourceThreadHolder = new Thread(arg =>
+            Thread sourceThreadHolder = new Thread(() =>
             {
-                Thread thisThread = (Thread) arg;
-
-                lock (_synchronizationPlug)
-                {
-                    _mainThreads.Remove(thisThread);
-                }
-
                 th.Start();
                 th.Join();
 
@@ -420,17 +412,17 @@ namespace ParseHelper
                 {
                     ActiveSessionsCount--;
 
-                    if (ActiveSessionsCount < AllowSessionsCount)
-                        for (int i = 0;
-                            i < Math.Min(AllowSessionsCount - ActiveSessionsCount,
-                                _mainThreads.Count(holderThread => holderThread.ThreadState == ThreadState.Unstarted));
-                            i++)
+                    while (ActiveSessionsCount < Math.Min(AllowSessionsCount, ActiveSessionsCount + _mainThreads.Count))
+                    {
+                        ActiveSessionsCount++;
+                        var firstUnstatedThread = _mainThreads.FirstOrDefault();
+
+                        if (firstUnstatedThread != null)
                         {
-                            ActiveSessionsCount++;
-                            _mainThreads
-                                .FirstOrDefault(holderThread => holderThread.ThreadState == ThreadState.Unstarted)
-                                ?.Start(arg);
+                            _mainThreads.Remove(firstUnstatedThread);
+                            firstUnstatedThread.Start();
                         }
+                    }
                 }
             });
 
@@ -438,23 +430,21 @@ namespace ParseHelper
             {
                 _mainThreads.Add(sourceThreadHolder);
 
-                if (ActiveSessionsCount < AllowSessionsCount)
-                    for (int i = 0;
-                        i < Math.Min
-                        (
-                            AllowSessionsCount - ActiveSessionsCount,
-                            _mainThreads.Count(holderThread => holderThread.ThreadState == ThreadState.Unstarted)
-                        );
-                        i++)
+                while (ActiveSessionsCount < Math.Min(AllowSessionsCount, ActiveSessionsCount + _mainThreads.Count))
+                {
+                    ActiveSessionsCount++;
+                    var firstUnstatedThread = _mainThreads.FirstOrDefault();
+
+                    if (firstUnstatedThread != null)
                     {
-                        ActiveSessionsCount++;
-                        _mainThreads
-                            .FirstOrDefault(holderThread => holderThread.ThreadState == ThreadState.Unstarted)
-                            ?.Start(sourceThreadHolder);
+                        _mainThreads.Remove(firstUnstatedThread);
+                        firstUnstatedThread.Start();
                     }
+                }
             }
         }
 
+        public Thread this[int i] => _mainThreads[i];
         public IEnumerator<Thread> GetEnumerator() => _mainThreads.GetEnumerator();
         IEnumerator IEnumerable.GetEnumerator() => _mainThreads.GetEnumerator();
     }

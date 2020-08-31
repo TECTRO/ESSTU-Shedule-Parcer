@@ -253,48 +253,7 @@ namespace ParseHelper
             {
                ExceptionEvent.Invoke(e);
             }
-            //excelFile.Save(Directory.GetCurrentDirectory()+"\\test");
         }
-
-        //public void ExcelExportAsync(IEnumerable<Schedule> savingSchedules, string path, bool isWait)
-        //{
-        //    Excel.Application excelFile;
-        //    try
-        //    {
-        //        excelFile = (Excel.Application)Marshal.GetActiveObject("Excel.Application");
-        //    }
-        //    catch
-        //    {
-        //        excelFile = new Excel.Application();
-        //    }
-
-        //    if(!Directory.Exists(path)) Directory.CreateDirectory(path);
-
-        //    ///////////////////////////////////////////////////////////
-        //    List<Thread> threads = new List<Thread>();
-        //    foreach (var savingSchedule in savingSchedules)
-        //    {
-        //        Thread local = new Thread(e =>
-        //        {
-        //            ExcelExport(savingSchedule, (Excel.Application)e, path);
-        //        });
-
-        //        local.Start(excelFile);
-        //        threads.Add(local);
-        //    }
-
-        //    if (isWait)
-        //    {
-        //        foreach (var thread in threads)
-        //            thread.Join();
-        //        ///////////////////////////////////////////////////////////
-        //        threads.Clear();
-        //        foreach (var excelFileWorkbook in excelFile.Workbooks)
-        //            ((Excel.Workbook) excelFileWorkbook).Close();
-        //    }
-
-        //    GC.Collect();
-        //}
 
         [Obsolete("не используется")]
         private void ExcelExport(Schedule savingSchedule, Excel.Application excelFile, string path)

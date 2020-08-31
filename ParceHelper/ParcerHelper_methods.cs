@@ -21,24 +21,6 @@ namespace ParseHelper
     {
         public delegate void GerLinksDelegate(string tableLink);
 
-        public delegate void GerScheduleDelegate(Schedule currentSchedule);
-
-        //////METHODS////////////////////////////////////////////////////////
-
-        public uint ActiveThreadsCount { get; private set; }
-        public uint ActiveThreadsMax { get; set; }
-
-        private delegate void ThreadCowerDelegate(); 
-        private void ThreadCower(ThreadCowerDelegate someFunc)
-        {
-            while (ActiveThreadsCount >= ActiveThreadsMax)
-                Thread.Sleep(10);
-
-            ActiveThreadsCount++;
-            someFunc();
-            ActiveThreadsCount--;
-        }
-
         ///REGEX-ES//////////////////////////////////////////////////////////
         protected static Regex WebLinkMask = new Regex(@"(?<mask>\S+)/\S+\.\S+", RegexOptions.IgnoreCase);
         protected static Regex WebLinkAddress = new Regex(@"href=""(?<address>\S+\.\S+)"".*<FONT.+>(?<linkname>.+)</FONT>", RegexOptions.IgnoreCase);
@@ -56,7 +38,6 @@ namespace ParseHelper
             HClient= new HttpClient(new HttpClientHandler{ MaxConnectionsPerServer = 10000, MaxRequestContentBufferSize = 1000000000});
             //ServicePointManager.DefaultConnectionLimit = 1000;
             Client = new WebClient();
-            ActiveThreadsMax = 10;
         }
 
         private static ParserHelper _initializationUnit;
