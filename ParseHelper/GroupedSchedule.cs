@@ -1,135 +1,10 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
-using System.Threading;
-using Microsoft.Office.Interop.Excel;
 
-// ReSharper disable once CheckNamespace
 namespace ParseHelper
 {
-    /////CLASSES/////////////////////////////////////////
-    public enum DayOfWeek
-    {
-        Monday,
-        Tuesday,
-        Wednesday,
-        Thursday,
-        Friday,
-        Saturday,
-        Sunday
-    }
-
-    public enum WorkingTime
-    {
-        First,
-        Second,
-        Third,
-        Fourth,
-        Fifth,
-        Sixth,
-        Seventh,
-        Eighth
-    }
-    public enum Week
-    {
-        Uneven,
-        Even,
-        Unidentified
-    }
-    public enum LessonType
-    {
-        Default,
-
-        Lection,
-        Practice,
-        Laboratory
-    }
-
-    public enum NodeType
-    {
-        Student,
-        Teacher,
-        Auditory,
-        Error
-    }
-
-    public enum SearchLevel
-    {
-        InScheduleName,
-        InNodesGroups,
-        InNodesAuditoriums,
-        InNodesProfessors
-    }
-    public class Node
-    {
-        public DayOfWeek Day { get; }
-        public WorkingTime Time { get; }
-
-        public LessonType LessonType { get; }
-        public string Subject { get; set; }
-
-        public override string ToString()
-        {
-            return (LessonType!=LessonType.Default?LessonType.ToString() + " \n" : "") + Subject;
-        }
-        public Node(DayOfWeek day, WorkingTime time, LessonType lType)
-        {
-            LessonType = lType;
-            Day = day;
-            Time = time;
-        }
-    }
-
-    interface IStudentNode
-    {
-        string GroupName { get; set; }
-    }
-    interface IProfessorNode
-    {
-        string ProfessorName { get; set; }
-    }
-    interface IAuditoryNode
-    {
-        string AuditoryName { get; set; }
-    }
-
-    public class StNode : Node, IAuditoryNode, IProfessorNode
-    {
-        public string ProfessorName { get; set; }
-        public string AuditoryName { get; set; }
-        public override string ToString()
-        {
-            return base.ToString() + " \n" + ProfessorName + " \n" + AuditoryName ;
-        }
-        public StNode(DayOfWeek day, WorkingTime time, LessonType lType) : base(day, time, lType) { }
-    }
-    public class PrepNode : Node, IAuditoryNode, IStudentNode
-    {
-        public string AuditoryName { get; set; }
-        public string GroupName { get; set; }
-
-        public override string ToString()
-        {
-            return base.ToString() + " \n" + AuditoryName + " \n" + GroupName;
-        }
-        public PrepNode(DayOfWeek day, WorkingTime time, LessonType lType) : base(day, time, lType) { }
-    }
-
-    public class AuditoryNode : Node, IStudentNode, IProfessorNode
-    {
-        public string GroupName { get; set; }
-        public string ProfessorName { get; set; }
-        public override string ToString()
-        {
-            return base.ToString() + " \n" + ProfessorName + " \n" + GroupName;
-        }
-        public AuditoryNode(DayOfWeek day, WorkingTime time, LessonType lType) : base(day, time, lType) { }
-    }
-
-
     /// <summary>
     /// Главный контейнер для обработки расписаний
     /// </summary>
@@ -166,7 +41,7 @@ namespace ParseHelper
         }
 
         private readonly ThreadManager _thManager;
-        private readonly ParserHelper _helper;
+        private readonly ScheduleParser _helper;
 
 
         public GroupOfSchedule(IEnumerable<Schedule> schedules)
@@ -174,12 +49,12 @@ namespace ParseHelper
             Schedules = schedules.ToList();
 
             _thManager = new ThreadManager();
-            _helper = new ParserHelper(_thManager);
+            _helper = new ScheduleParser(_thManager);
         }
         public GroupOfSchedule()
         {
             _thManager = new ThreadManager();
-            _helper = new ParserHelper(_thManager);
+            _helper = new ScheduleParser(_thManager);
         }
         public string GroupName { get; set; }
         public List<Schedule> Schedules { get; private set; }
@@ -188,20 +63,20 @@ namespace ParseHelper
         {
             get
             {
-                return Subgroups?.FirstOrDefault(t=>string.Equals(t.GroupName,name,StringComparison.CurrentCultureIgnoreCase));
+                return Subgroups?.FirstOrDefault(t => string.Equals(t.GroupName, name, StringComparison.CurrentCultureIgnoreCase));
             }
         }
         public GroupOfSchedule PutToSubgroup(string subName, Regex filter, NodeType assignedType)
         {
-            if (Subgroups==null) Subgroups = new List<GroupOfSchedule>();
-            
+            if (Subgroups == null) Subgroups = new List<GroupOfSchedule>();
+
             var currentGroup = Subgroups.FirstOrDefault(t => string.Equals(t.GroupName, subName, StringComparison.CurrentCultureIgnoreCase));
 
-            if (currentGroup!=null)
+            if (currentGroup != null)
                 currentGroup.Schedules.AddRange(Schedules.Where(t => filter.IsMatch(t.Name) && t.GetNodeType() == assignedType));
             else
             {
-                currentGroup = new GroupOfSchedule(Schedules.Where(t => filter.IsMatch(t.Name) && t.GetNodeType() == assignedType)) {GroupName = subName};
+                currentGroup = new GroupOfSchedule(Schedules.Where(t => filter.IsMatch(t.Name) && t.GetNodeType() == assignedType)) { GroupName = subName };
                 Subgroups.Add(currentGroup);
             }
 
@@ -211,13 +86,13 @@ namespace ParseHelper
         }
         public void PutToSubgroups(GroupFilter filters)
         {
-            PutToSubgroups(this,filters);
+            PutToSubgroups(this, filters);
         }
         private static void PutToSubgroups(GroupOfSchedule group, GroupFilter filters)
         {
             if (filters.Filter != null)
-                if(group.Schedules!=null)
-                    if(group.Schedules.Any(t => filters.Filter.IsMatch(t.Name) && t.GetNodeType() == filters.AssignType))
+                if (group.Schedules != null)
+                    if (group.Schedules.Any(t => filters.Filter.IsMatch(t.Name) && t.GetNodeType() == filters.AssignType))
                         group = group.PutToSubgroup(filters.GroupName, filters.Filter, filters.AssignType);
 
             if (filters.SubFilters != null)
@@ -236,9 +111,9 @@ namespace ParseHelper
         //        isFinished = true;
         //    }
         //    _thManager.ThreadsEndedEvent += FinishMarker;
-            
+
         //    waiterFunc?.Invoke();
-            
+
         //    while (!isFinished) { }
         //    _thManager.ThreadsEndedEvent -= FinishMarker;
 
@@ -247,7 +122,7 @@ namespace ParseHelper
         {
             var loadedSchedules = new List<Schedule>();
 
-            _helper.AsyncWaiter(() =>
+            _thManager.Wait(() =>
             {
                 foreach (var source in sources)
                 {
@@ -255,7 +130,7 @@ namespace ParseHelper
                 }
             });
 
-            if (Schedules == null)Schedules = new List<Schedule>();
+            if (Schedules == null) Schedules = new List<Schedule>();
             Schedules.AddRange(_helper.RemoveRepeats(loadedSchedules));
         }
 
@@ -265,7 +140,7 @@ namespace ParseHelper
             foreach (var source in sources)
             {
                 var res = new List<Schedule>();
-                _helper.AsyncWaiter(() => { _helper.FillTableRecurcieveAsync(source.WebLink, source.LinkType, res); });
+                _thManager.Wait(() => { _helper.FillTableRecurcieveAsync(source.WebLink, source.LinkType, res); });
                 loadedSchedules.AddRange(res);
             }
             //foreach (var source in sources)
@@ -282,7 +157,7 @@ namespace ParseHelper
             Schedules.AddRange(_helper.ConvertToAuditorySchedule(sources));
         }
 
-        public ParserHelper GetHelper()
+        public ScheduleParser GetHelper()
         {
             return _helper;
         }
@@ -293,7 +168,7 @@ namespace ParseHelper
 
         static GroupOfSchedule()
         {
-            DefaultFilters = new GroupFilter("DEFAULT",null,NodeType.Error,new []
+            DefaultFilters = new GroupFilter("DEFAULT", null, NodeType.Error, new[]
             {
                 new GroupFilter("Корпуса",new Regex(@"(?<audit>\d*-?\w*-?\w*)"),NodeType.Auditory, new []
                 {
@@ -319,7 +194,7 @@ namespace ParseHelper
                     new GroupFilter("Корпус 20",new Regex("^20-.*"),NodeType.Auditory,null ),
                     new GroupFilter("Корпус 21",new Regex("^21-.*"),NodeType.Auditory,null )
                 }),
-                new GroupFilter("Студенты", ParserHelper.Group,NodeType.Student, new []
+                new GroupFilter("Студенты", ScheduleParser.Group,NodeType.Student, new []
                 {
                     new GroupFilter("Бакалавриат", new Regex(@"\w*Б\w*\s?\d{3}.*",RegexOptions.IgnoreCase),NodeType.Student, null),
                     new GroupFilter("Специалитет", new Regex(@"^\d{3}.*"),NodeType.Student, null),
@@ -328,7 +203,7 @@ namespace ParseHelper
                     new GroupFilter("Колледж", new Regex(@"^К.*",RegexOptions.IgnoreCase),NodeType.Student, null)
                 }),
                 new GroupFilter("Преподаватели", new Regex(@".*"), NodeType.Teacher, null),
-            }); 
+            });
         }
     }
 
@@ -376,7 +251,7 @@ namespace ParseHelper
 
                 foreach (var node in LectionList)
                 {
-                    if(result[(int)node.Time][(int)node.Day] == null) 
+                    if (result[(int)node.Time][(int)node.Day] == null)
                         result[(int)node.Time][(int)node.Day] = new List<Node>();
 
                     result[(int)node.Time][(int)node.Day].Add(node);
@@ -397,106 +272,4 @@ namespace ParseHelper
             }
         }
     }
-
-    /////////////////////////////////////////////////////
-
-    public class ThreadManager : IEnumerable<Thread>
-    {
-        private readonly List<Thread> _mainThreads = new List<Thread>();
-        public int AllowSessionsCount { get; }
-        public int ActiveSessionsCount { get; private set; }
-
-        private readonly object _synchronizationPlug = new object();
-
-        public delegate void ThreadsEnded();
-
-        public event ThreadsEnded ThreadsEndedEvent;
-
-
-        /// <summary>
-        ///DEBUG
-        /// 
-        public static bool DebuggerOff = false;
-        void StartDebugger()
-        {
-            new Thread(() =>
-                {
-                    int oldval = 0;
-                    while (!DebuggerOff)
-                    {
-                        var r = ActiveSessionsCount;
-                        if (r != oldval)
-                        {
-                            Console.WriteLine(
-                                $"active sessions: {ActiveSessionsCount};\nmax sessions: {AllowSessionsCount}; \nwaiting sessions: {_mainThreads.Count}.\n");
-                        }
-
-                        oldval = r;
-
-                    }
-                }
-            ).Start();
-        }
-        /// </summary>
-
-        public ThreadManager(int allowSessionsCount) => AllowSessionsCount = allowSessionsCount;
-
-        public ThreadManager()
-        {
-            AllowSessionsCount = Environment.ProcessorCount /2;
-            StartDebugger();
-        }
-
-        public void Add(Thread th)
-        {
-            Thread sourceThreadHolder = new Thread(() =>
-            {
-                th.Start();
-                th.Join();
-
-                lock (_synchronizationPlug)
-                {
-                    ActiveSessionsCount--;
-
-                    while (ActiveSessionsCount < Math.Min(AllowSessionsCount, ActiveSessionsCount + _mainThreads.Count))
-                    {
-                        ActiveSessionsCount++;
-                        var firstUnstatedThread = _mainThreads.FirstOrDefault();
-
-                        if (firstUnstatedThread != null)
-                        {
-                            _mainThreads.Remove(firstUnstatedThread);
-                            firstUnstatedThread.Start();
-                        }
-                    }
-
-                    if(_mainThreads.Count == 0 && ActiveSessionsCount == 0)
-                        ThreadsEndedEvent?.Invoke();
-                }
-            });
-
-            lock (_synchronizationPlug)
-            {
-                _mainThreads.Add(sourceThreadHolder);
-
-                while (ActiveSessionsCount < Math.Min(AllowSessionsCount, ActiveSessionsCount + _mainThreads.Count))
-                {
-                    ActiveSessionsCount++;
-                    var firstUnstatedThread = _mainThreads.FirstOrDefault();
-
-                    if (firstUnstatedThread != null)
-                    {
-                        _mainThreads.Remove(firstUnstatedThread);
-                        firstUnstatedThread.Start();
-                    }
-                }
-            }
-        }
-
-        public Thread this[int i] => _mainThreads[i];
-        public IEnumerator<Thread> GetEnumerator() => _mainThreads.GetEnumerator();
-        IEnumerator IEnumerable.GetEnumerator() => _mainThreads.GetEnumerator();
-    }
-
-
 }
