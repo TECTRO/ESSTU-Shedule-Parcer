@@ -101,6 +101,7 @@ namespace ParseHelper
                 }
         }
         //todo убрать методы loadschedules u loadauditoriums из groupedSchedule в parseHelper скорее всего в синк раздел, и очистить этот раздел от старых и неэффективных методов, которые только затрудняют ориентирование внутри проекта
+        //todo создать раздел коммон для самых простых, общих и часто используемых методов, перетащить туда  ToAuditorySchedules вместе со всем что сейчас в корневом разделе
         public void LoadSchedules(IEnumerable<Source> sources)
         {
             var loadedSchedules = new List<Schedule>();
