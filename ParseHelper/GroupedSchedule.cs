@@ -100,6 +100,7 @@ namespace ParseHelper
                     CreateSubgroupsTree(group, filtersSubFilter);
                 }
         }
+        //todo убрать методы loadschedules u loadauditoriums из groupedSchedule в parseHelper скорее всего в синк раздел, и очистить этот раздел от старых и неэффективных методов, которые только затрудняют ориентирование внутри проекта
         public void LoadSchedules(IEnumerable<Source> sources)
         {
             var loadedSchedules = new List<Schedule>();
