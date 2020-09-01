@@ -30,13 +30,13 @@ namespace ParseHelper
         /// 
         ///DEBUG
         /// 
-        public static bool UseDebugger = false;
+        public static bool UseDebugger;
         void StartDebugger()
         {
             new Thread(() =>
                 {
                     int oldval = 0;
-                    while (!UseDebugger)
+                    while (UseDebugger)
                     {
                         var r = ActiveSessionsCount;
                         if (r != oldval)

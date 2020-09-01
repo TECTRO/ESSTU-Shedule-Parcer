@@ -66,7 +66,9 @@ namespace ParseHelper
                 return Subgroups?.FirstOrDefault(t => string.Equals(t.GroupName, name, StringComparison.CurrentCultureIgnoreCase));
             }
         }
-        public GroupOfSchedule PutToSubgroup(string subName, Regex filter, NodeType assignedType)
+
+        public void ToSubgroup(string subName, Regex filter, NodeType assignedType) => CreateSubgroup(subName, filter, assignedType);
+        private GroupOfSchedule CreateSubgroup(string subName, Regex filter, NodeType assignedType)
         {
             if (Subgroups == null) Subgroups = new List<GroupOfSchedule>();
 
@@ -84,40 +86,20 @@ namespace ParseHelper
             if (Schedules.Count == 0) Schedules = null;
             return currentGroup;
         }
-        public void PutToSubgroups(GroupFilter filters)
-        {
-            PutToSubgroups(this, filters);
-        }
-        private static void PutToSubgroups(GroupOfSchedule group, GroupFilter filters)
+        public void ToSubgroupsTree(GroupFilter filters) => CreateSubgroupsTree(this, filters);
+        private static void CreateSubgroupsTree(GroupOfSchedule group, GroupFilter filters)
         {
             if (filters.Filter != null)
                 if (group.Schedules != null)
                     if (group.Schedules.Any(t => filters.Filter.IsMatch(t.Name) && t.GetNodeType() == filters.AssignType))
-                        group = group.PutToSubgroup(filters.GroupName, filters.Filter, filters.AssignType);
+                        group = group.CreateSubgroup(filters.GroupName, filters.Filter, filters.AssignType);
 
             if (filters.SubFilters != null)
                 foreach (var filtersSubFilter in filters.SubFilters)
                 {
-                    PutToSubgroups(group, filtersSubFilter);
+                    CreateSubgroupsTree(group, filtersSubFilter);
                 }
         }
-
-        //public delegate void WaiterDelegate();
-        //private void AsyncWaiter(WaiterDelegate waiterFunc)
-        //{
-        //    bool isFinished = false;
-        //    void FinishMarker()
-        //    {
-        //        isFinished = true;
-        //    }
-        //    _thManager.ThreadsEndedEvent += FinishMarker;
-
-        //    waiterFunc?.Invoke();
-
-        //    while (!isFinished) { }
-        //    _thManager.ThreadsEndedEvent -= FinishMarker;
-
-        //}
         public void LoadSchedules(IEnumerable<Source> sources)
         {
             var loadedSchedules = new List<Schedule>();
@@ -126,7 +108,7 @@ namespace ParseHelper
             {
                 foreach (var source in sources)
                 {
-                    _helper.FillTableRecurcieveAsync(source.WebLink, source.LinkType, loadedSchedules);
+                    _helper.Async.FillTableRecurcieveAsync(source.WebLink, source.LinkType, loadedSchedules);
                 }
             });
 
@@ -140,7 +122,7 @@ namespace ParseHelper
             foreach (var source in sources)
             {
                 var res = new List<Schedule>();
-                _thManager.Wait(() => { _helper.FillTableRecurcieveAsync(source.WebLink, source.LinkType, res); });
+                _thManager.Wait(() => { _helper.Async.FillTableRecurcieveAsync(source.WebLink, source.LinkType, res); });
                 loadedSchedules.AddRange(res);
             }
             //foreach (var source in sources)
@@ -149,12 +131,12 @@ namespace ParseHelper
             //}
 
             if (Schedules == null) Schedules = new List<Schedule>();
-            Schedules.AddRange(_helper.ConvertToAuditorySchedule(_helper.RemoveRepeats(loadedSchedules)));
+            Schedules.AddRange(_helper.Sync.ToAuditorySchedules(_helper.RemoveRepeats(loadedSchedules)));
         }
         public void ToAuditoriums(IEnumerable<Schedule> sources)
         {
             if (Schedules == null) Schedules = new List<Schedule>();
-            Schedules.AddRange(_helper.ConvertToAuditorySchedule(sources));
+            Schedules.AddRange(_helper.Sync.ToAuditorySchedules(sources));
         }
 
         public ScheduleParser GetHelper()

@@ -23,6 +23,7 @@ namespace SheduleParcer
         //=================================================
         static void Main(string[] args)
         {
+            ThreadManager.UseDebugger = true;
             // !!!THREADWATCHER DEBUG!!!
             //ThreadWatcher thWatcher = new ThreadWatcher();
             //object obj = new object();
@@ -209,6 +210,7 @@ namespace SheduleParcer
            //var filter = GroupOfSchedule.DefaultFilters["студенты"]["Бакалавриат"];
 
             GroupOfSchedule mainGroupContainer = new GroupOfSchedule();
+            //mainGroupContainer.
 
             mainGroupContainer.LoadSchedules(new []
             {
@@ -224,7 +226,7 @@ namespace SheduleParcer
                 new GroupOfSchedule.Source("https://portal.esstu.ru/bakalavriat/craspisanEdt.htm", NodeType.Teacher)
             });
 
-            mainGroupContainer.PutToSubgroups(GroupOfSchedule.DefaultFilters);
+            mainGroupContainer.ToSubgroupsTree(GroupOfSchedule.DefaultFilters);
 
             //var r = string.Join("\n", mainGroupContainer.Schedules?.Select(t => t.Name).Where(t=>!t.ToLower().Contains("фкс")&& !t.ToLower().Contains("вакансия")) ?? new List<string>()); 
             //var r1 = mainGroupContainer["студенты"]["бакалавриат"];
@@ -235,7 +237,8 @@ namespace SheduleParcer
             //{
             //    Console.ReadKey();
             //} while (true);
-            ThreadManager.DebuggerOff = true;
+            ThreadManager.UseDebugger = false;
+
         }
     }
 }

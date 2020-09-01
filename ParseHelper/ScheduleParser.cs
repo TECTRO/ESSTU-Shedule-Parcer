@@ -13,9 +13,18 @@ using System.Threading;
 using System.Threading.Tasks;
 namespace ParseHelper
 {
-    public class ScheduleParser
+    public partial class ScheduleParser
     {
-        public delegate void GerLinksDelegate(string tableLink);
+        private ThreadManager ThManager { get; }
+        public ScheduleParser(ThreadManager manager)
+        {
+            ThManager = manager;
+            Sync = new SyncMethods(this);
+            Async = new AsyncMethods(this);
+            Grouping = new GroupingMethods(this);
+        }
+
+        public delegate void GerLinksDelegate(string tableLink, string tableData);
 
         ///REGEX-ES//////////////////////////////////////////////////////////
         protected static Regex WebLinkMask = new Regex(@"(?<mask>\S+)/\S+\.\S+", RegexOptions.IgnoreCase);
@@ -34,66 +43,32 @@ namespace ParseHelper
         private readonly object _synchronizationPlug = new object();
         ///
 
-        private ThreadManager ThManager { get; }
-        public ScheduleParser(ThreadManager manager) => ThManager = manager;
 
-        private static TextInfo _info;
-        public string CorrectRegister(string source)
+        public IEnumerable<Schedule> FilterTables(IEnumerable<Schedule> tables, Regex regExFilter, SearchLevel level)
         {
-            if (_info == null) _info = new CultureInfo("en-US", false).TextInfo;
-
-            return _info.ToTitleCase(source.ToLower());
-        }
-
-        public IEnumerable<string> GetLinksRecursive(string website)
-        {
-            string mask = WebLinkMask.Match(website).Groups["mask"].Value + '/';
-
-            using (WebClient client = new WebClient())
+            switch (level)
             {
-                string mainData;
-
-                try
+                case SearchLevel.InScheduleName:
                 {
-                    mainData = client.DownloadString(website);
+                    return tables.Where(t => regExFilter.Matches(t.Name).Count > 0);
                 }
-                catch (Exception e)
+                case SearchLevel.InNodesAuditoriums:
                 {
-                    ExceptionEvent?.Invoke(e);
-                    return null;
+                    return tables.Where(t => t.TablesList.Any(s => s.LectionList.Any(f => f.GetType() == typeof(IAuditoryNode) && regExFilter.Matches(((IAuditoryNode)f).AuditoryName).Count > 0)));
                 }
-
-                List<string> results = new List<string>();
-
-                var filteredMatches = WebLinkAddress.Matches(mainData).Cast<Match>()
-                    .Where(t => !t.Groups["address"].Value.Contains("http") &&
-                                t.Groups["linkname"].Value.Any(c => char.IsDigit(c) || char.IsLetter(c)))
-                    .Select(t => t.Groups["address"].Value)
-                    .Distinct()
-                    .ToList();
-
-                if (!filteredMatches.Any())
+                case SearchLevel.InNodesGroups:
                 {
-                    filteredMatches = WebLinkAddressShort.Matches(mainData).Cast<Match>()
-                        .Where(t => !t.Groups["address"].Value.Contains("http"))
-                        .Select(t => t.Groups["address"].Value)
-                        .Distinct()
-                        .ToList();
+                    return tables.Where(t => t.TablesList.Any(s => s.LectionList.Any(f => f.GetType() == typeof(IStudentNode) && regExFilter.Matches(((IStudentNode)f).GroupName).Count > 0)));
+                }
+                case SearchLevel.InNodesProfessors:
+                {
+                    return tables.Where(t => t.TablesList.Any(s => s.LectionList.Any(f => f.GetType() == typeof(IProfessorNode) && regExFilter.Matches(((IProfessorNode)f).ProfessorName).Count > 0)));
                 }
 
-                if (filteredMatches.Any())
-                {
-                    foreach (var match in filteredMatches)
-                    {
-                        results.AddRange(GetLinksRecursive(mask + match));
-                    }
-                }
-                else results.Add(website);
-
-                return results;
+                default: return new List<Schedule>();
             }
-        }
 
+        }
         public IEnumerable<Schedule> RemoveRepeats(IEnumerable<Schedule> schedules)
         {
             var converted = schedules.ToList();
@@ -132,252 +107,6 @@ namespace ParseHelper
 
             return converted;
         }
-        private void GetLinksRecursiveAsync(string website, ICollection<string> result, GerLinksDelegate inputFunctionDelegate = null)
-        {
-            string mask = WebLinkMask.Match(website).Groups["mask"].Value + '/';
-
-            using (WebClient client = new WebClient())
-            {
-                string mainData;
-
-                try
-                {
-                    mainData = client.DownloadString(website);
-                }
-                catch (Exception e)
-                {
-                    ExceptionEvent?.Invoke(e);
-                    return;
-                }
-
-                var filteredMatches = WebLinkAddress.Matches(mainData).Cast<Match>()
-                    .Where(t => !t.Groups["address"].Value.Contains("http") && t.Groups["linkname"].Value
-                                    .Any(c => char.IsDigit(c) || char.IsLetter(c)))
-                    .Select(t => t.Groups["address"].Value)
-                    .Distinct()
-                    .ToList();
-
-                if (!filteredMatches.Any())
-                {
-                    filteredMatches = WebLinkAddressShort.Matches(mainData).Cast<Match>()
-                        .Where(t => !t.Groups["address"].Value.Contains("http"))
-                        .Select(t => t.Groups["address"].Value)
-                        .Distinct()
-                        .ToList();
-                }
-
-                if (filteredMatches.Any())
-                {
-                    foreach (var match in filteredMatches)
-                    {
-                        ThManager.Add(
-                            new Thread(() =>
-                            {
-                                GetLinksRecursiveAsync(mask + match, result, inputFunctionDelegate);
-
-                            }));
-                    }
-                }
-                else
-                {
-                    lock (_synchronizationPlug)
-                    {
-                        result?.Add(website);
-                    }
-
-                    inputFunctionDelegate?.Invoke(website);
-                }
-            }
-        }
-
-        public void FillTableRecurcieveAsync(string website, NodeType type, ICollection<Schedule> result)
-        {
-            GetLinksRecursiveAsync(website, null, e =>
-            {
-                FillTableAsync(e, type, result);
-            });
-        }
-
-        public void FillTableRecurcieveAsync(IEnumerable<string> websites, NodeType type, ICollection<Schedule> result)
-        {
-            foreach (var website in websites)
-            {
-                var curThread = new Thread(() => {
-                    GetLinksRecursiveAsync(website, null, e =>
-                    {
-                        FillTableAsync(e, type, result);
-                    });
-                });
-
-                ThManager.Add(curThread);
-            }
-        }
-        public IEnumerable<Schedule> SelectTables(IEnumerable<Schedule> tables, Regex regExFilter, SearchLevel level)
-        {
-            switch (level)
-            {
-                case SearchLevel.InScheduleName:
-                    {
-                        return tables.Where(t => regExFilter.Matches(t.Name).Count > 0);
-                    }
-                case SearchLevel.InNodesAuditoriums:
-                    {
-                        return tables.Where(t => t.TablesList.Any(s => s.LectionList.Any(f => f.GetType() == typeof(IAuditoryNode) && regExFilter.Matches(((IAuditoryNode)f).AuditoryName).Count > 0)));
-                    }
-                case SearchLevel.InNodesGroups:
-                    {
-                        return tables.Where(t => t.TablesList.Any(s => s.LectionList.Any(f => f.GetType() == typeof(IStudentNode) && regExFilter.Matches(((IStudentNode)f).GroupName).Count > 0)));
-                    }
-                case SearchLevel.InNodesProfessors:
-                    {
-                        return tables.Where(t => t.TablesList.Any(s => s.LectionList.Any(f => f.GetType() == typeof(IProfessorNode) && regExFilter.Matches(((IProfessorNode)f).ProfessorName).Count > 0)));
-                    }
-
-                default: return new List<Schedule>();
-            }
-
-        }
-        public IEnumerable<Schedule> ConvertToAuditorySchedule(IEnumerable<Schedule> source)
-        {
-            //internal methods ===============================================
-
-            AuditoryNode GetConvertedNode(Schedule origSchedule, Node origNode)
-            {
-                var newAuditoryNode = new AuditoryNode(origNode.Day, origNode.Time, origNode.LessonType) { Subject = origNode.Subject };
-
-                switch (origSchedule.GetNodeType())
-                {
-                    case NodeType.Student:
-                        {
-                            newAuditoryNode.GroupName = origSchedule.Name;
-                            newAuditoryNode.ProfessorName = (origNode as IProfessorNode)?.ProfessorName;
-                        }
-                        break;
-
-                    case NodeType.Teacher:
-                        {
-                            newAuditoryNode.GroupName = (origNode as IStudentNode)?.GroupName;
-                            newAuditoryNode.ProfessorName = origSchedule.Name;
-                        }
-                        break;
-                }
-
-                return newAuditoryNode;
-            }
-
-            Schedule.ScheduleTable GetConvertedScheduleTable(Schedule origSchedule, Schedule.ScheduleTable origScheduleTable, Node origNode)
-            {
-                Schedule.ScheduleTable audTable = new Schedule.ScheduleTable { SelectedWeek = origScheduleTable.SelectedWeek };
-
-                audTable.LectionList.Add(GetConvertedNode(origSchedule, origNode));
-
-                return audTable;
-            }
-
-            Schedule GetConvertedSchedule(Schedule origSchedule, Schedule.ScheduleTable origScheduleTable, Node origNode)
-            {
-                return new Schedule(((IAuditoryNode)origNode).AuditoryName, new[] { GetConvertedScheduleTable(origSchedule, origScheduleTable, origNode) });
-            }
-            //=================================================================
-
-            List<Schedule> result = new List<Schedule>();
-
-            foreach (var schedule in source)
-            {
-                foreach (var scheduleTable in schedule.TablesList)
-                {
-                    foreach (var node in scheduleTable.LectionList)
-                    {
-                        if (!result.Exists(t => t.Name == ((IAuditoryNode)node).AuditoryName))
-                        {
-                            result.Add(GetConvertedSchedule(schedule, scheduleTable, node));
-                        }
-                        else
-                        {
-                            var curAudSchedule = result.Find(t => t.Name == ((IAuditoryNode)node).AuditoryName);
-
-                            if (!curAudSchedule.TablesList.Exists(t => t.SelectedWeek == scheduleTable.SelectedWeek))
-                            {
-                                curAudSchedule.TablesList.Add(GetConvertedScheduleTable(schedule, scheduleTable, node));
-                            }
-                            else
-                            {
-                                var curAudTable = curAudSchedule.TablesList.Find(t => t.SelectedWeek == scheduleTable.SelectedWeek);
-
-                                curAudTable.LectionList.Add(GetConvertedNode(schedule, node));
-                            }
-                        }
-                    }
-                }
-            }
-            return result;
-        }
-        public IEnumerable<Schedule> FillTableRecurcieve(string website, NodeType type)
-        {
-            return FillTable(GetLinksRecursive(website), type);
-        }
-        public IEnumerable<Schedule> FillTableRecurcieve(IEnumerable<string> websites, NodeType type)
-        {
-            List<string> links = new List<string>();
-            foreach (var website in websites)
-            {
-                links.AddRange(GetLinksRecursive(website));
-            }
-            return FillTable(links, type);
-        }
-        public IEnumerable<Schedule> FillTable(IEnumerable<string> tableLinks, NodeType type)
-        {
-            var result = new List<Schedule>();
-
-            foreach (var link in tableLinks)
-                result.AddRange(FillTable(link, type));
-
-            return result;
-        }
-        public IEnumerable<Schedule> FillTable(string tableLink, NodeType type)
-        {
-            using (WebClient client = new WebClient())
-            {
-                string mainData;
-
-                try
-                {
-                    mainData = client.DownloadString(tableLink);
-                }
-                catch
-                {
-                    return new List<Schedule>();
-                }
-
-                return FillTable(type, mainData);
-            }
-        }
-
-        private void FillTableAsync(string tableLink, NodeType type, ICollection<Schedule> result)
-        {
-            Thread local = new Thread(() =>
-            {
-                using (WebClient client = new WebClient())
-                {
-                    try
-                    {
-                        var preResult = FillTable(type, client.DownloadString(tableLink));
-
-                        lock (_synchronizationPlug)
-                        {
-                            foreach (var schedule in preResult)
-                                result.Add(schedule);
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        ExceptionEvent?.Invoke(e);
-                    }
-                }
-            });
-            ThManager.Add(local);
-        }
-
         private IEnumerable<string> MySplit(string value, string splitter)
         {
             List<string> result = new List<string>();
@@ -389,6 +118,13 @@ namespace ParseHelper
             return result;
         }
 
+        private static TextInfo _info;
+        public string CorrectRegister(string source)
+        {
+            if (_info == null) _info = new CultureInfo("en-US", false).TextInfo;
+
+            return _info.ToTitleCase(source.ToLower());
+        }
         /// <summary>
         /// основная функция, на которой все построено
         /// </summary>
@@ -466,7 +202,17 @@ namespace ParseHelper
                                                 string prevSubject = String.Empty;
                                                 do
                                                 {
-                                                    var curAuditory = Auditory.Match(rawNode).Groups["audit"].Value;
+                                                    string curAuditory = new[]
+                                                    {
+                                                        new Regex(@"дист\.", RegexOptions.IgnoreCase),
+                                                        new Regex(@"а\.\s?д\.\s?о\s?", RegexOptions.IgnoreCase)
+                                                    }
+                                                        .Select(reg => reg.Match(rawNode).Value)
+                                                        .FirstOrDefault(s=>!string.IsNullOrEmpty(s));
+
+                                                    if (string.IsNullOrEmpty(curAuditory))
+                                                        curAuditory = Auditory.Match(rawNode).Groups["audit"].Value;
+                                                    
                                                     var curProfessor = ProfessorFio.Match(rawNode).Value;
 
                                                     var spitted = MySplit(rawNode, curAuditory).ToArray();
@@ -497,9 +243,11 @@ namespace ParseHelper
                                                         .Replace("а.", "")
                                                         .Replace("и/д", "")
                                                         .Replace(".", "")
+                                                        .Replace(",", "")
                                                         .Replace("-", "");
-
-                                                        while (curSubject[curSubject.Length - 1] == ' ')
+                                                        
+                                                        //if (curSubject != string.Empty)
+                                                        while ("., ".Contains(curSubject[curSubject.Length - 1]))
                                                         {
                                                             curSubject = curSubject.Remove(curSubject.Length - 1, 1);
                                                             if (curSubject.Length == 0) break;
@@ -540,7 +288,9 @@ namespace ParseHelper
                                             }
                                             break;
                                         case NodeType.Teacher:
-                                            {
+                                        {
+                                            var tempnode = rawNode;
+
                                                 rawNode = rawNode
                                                     .Replace("лек.", "")
                                                     .Replace("пр.", "")
@@ -548,10 +298,12 @@ namespace ParseHelper
                                                     .Replace("и/д", "");
 
                                                 var curAuditory = Auditory.Match(rawNode).Groups["audit"].Value;
-                                                rawNode = rawNode.Replace(curAuditory, "");
+                                                if(!string.IsNullOrEmpty(curAuditory))
+                                                    rawNode = rawNode.Replace(curAuditory, "");
 
                                                 var curGroup = Group.Match(rawNode).Groups["group"].Value;
-                                                rawNode = rawNode.Replace(curGroup, "");
+                                                if(!string.IsNullOrEmpty(curGroup))
+                                                    rawNode = rawNode.Replace(curGroup, "");
 
                                                 rawNode = rawNode
                                                     .Replace("а.", "")
