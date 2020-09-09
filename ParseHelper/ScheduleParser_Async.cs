@@ -17,21 +17,22 @@ namespace ParseHelper
             internal AsyncMethods(ScheduleParser parent) => _parent = parent;
             //===============================================================================================
           
-            public void FillTableRecurcieveAsync(string website, NodeType type, ICollection<Schedule> result)
+            public void LoadSchedulesRecurcieveAsync(string website, NodeType type, ICollection<Schedule> result)
             {
                 GetLinksRecursiveAsync(website, null, (l, d) =>
                 {
-                     _=_parent.FillTable(type, d).Where(sch => { result.Add(sch); return true; });
+                    foreach (var schedule in _parent.FillTable(type, d))
+                        result.Add(schedule);
                 });
             }
-            public void FillTableRecurcieveAsync(IEnumerable<string> websites, NodeType type, ICollection<Schedule> result)
+            public void LoadSchedulesRecurcieveAsync(IEnumerable<string> websites, NodeType type, ICollection<Schedule> result)
             {
                 foreach (var website in websites)
                 {
-                    _parent.ThManager.Add(new Thread(() => FillTableRecurcieveAsync(website, type, result)));
+                    _parent.ThManager.Add(new Thread(() => LoadSchedulesRecurcieveAsync(website, type, result)));
                 }
             }
-            private void FillTableAsync(string tableLink, NodeType type, ICollection<Schedule> result)
+            private void LoadSchedulesAsync(string tableLink, NodeType type, ICollection<Schedule> result)
             {
                 Thread local = new Thread(() =>
                 {

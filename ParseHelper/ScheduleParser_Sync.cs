@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
+using static ParseHelper.GroupOfSchedule;
 
 namespace ParseHelper
 {
@@ -62,7 +63,8 @@ namespace ParseHelper
                     return results;
                 }
             }
-            public IEnumerable<Schedule> ToAuditorySchedules(IEnumerable<Schedule> source)
+            
+            public IEnumerable<Schedule> ConvertSchedulesToAuditoriums(IEnumerable<Schedule> source)
             {
                 //internal methods ===============================================
 
@@ -137,47 +139,35 @@ namespace ParseHelper
                 }
                 return result;
             }
-            public IEnumerable<Schedule> FillTableRecurcieve(string website, NodeType type)
+
+            public IEnumerable<Schedule> LoadSchedulesAsAuditoriums(IEnumerable<Source> sources)
             {
-                return FillTable(GetLinksRecursive(website), type);
-            }
-            public IEnumerable<Schedule> FillTableRecurcieve(IEnumerable<string> websites, NodeType type)
-            {
-                List<string> links = new List<string>();
-                foreach (var website in websites)
+                var loadedSchedules = new List<Schedule>();
+                foreach (var source in sources)
                 {
-                    links.AddRange(GetLinksRecursive(website));
+                    var res = new List<Schedule>();
+                    _parent.ThManager.Wait(() => { _parent.Async.LoadSchedulesRecurcieveAsync(source.WebLink, source.LinkType, res); });
+                    loadedSchedules.AddRange(res);
                 }
-                return FillTable(links, type);
-            }
-            public IEnumerable<Schedule> FillTable(IEnumerable<string> tableLinks, NodeType type)
-            {
-                var result = new List<Schedule>();
 
-                foreach (var link in tableLinks)
-                    result.AddRange(FillTable(link, type));
-
-                return result;
+                return _parent.Sync.ConvertSchedulesToAuditoriums(_parent.Common.RemoveRepeats(loadedSchedules));
             }
-            public IEnumerable<Schedule> FillTable(string tableLink, NodeType type)
+
+            public IEnumerable<Schedule> LoadSchedules(IEnumerable<Source> sources)
             {
-                using (WebClient client = new WebClient())
+                var loadedSchedules = new List<Schedule>();
+
+                _parent.ThManager.Wait(() =>
                 {
-                    string mainData;
-
-                    try
+                    foreach (var source in sources)
                     {
-                        mainData = client.DownloadString(tableLink);
+                        _parent.Async.LoadSchedulesRecurcieveAsync(source.WebLink, source.LinkType, loadedSchedules);
                     }
-                    catch
-                    {
-                        return new List<Schedule>();
-                    }
+                });
 
-                    return _parent.FillTable(type, mainData);
-                }
+                return _parent.Common.RemoveRepeats(loadedSchedules);
             }
-
+            
         }
     }
 }

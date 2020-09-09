@@ -47,6 +47,7 @@
     <Compile Include="ScheduleExtender.cs" />
     <Compile Include="ScheduleParser.cs" />
     <Compile Include="ScheduleParser_Async.cs" />
+    <Compile Include="ScheduleParser_Common.cs" />
     <Compile Include="ScheduleParser_Grouping.cs" />
     <Compile Include="ScheduleParser_Sync.cs" />
     <Compile Include="ThreadManager.cs" />

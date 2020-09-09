@@ -40,22 +40,11 @@ namespace ParseHelper
             public NodeType AssignType { get; }
         }
 
-        private readonly ThreadManager _thManager;
-        private readonly ScheduleParser _helper;
-
-
         public GroupOfSchedule(IEnumerable<Schedule> schedules)
         {
             Schedules = schedules.ToList();
-
-            _thManager = new ThreadManager();
-            _helper = new ScheduleParser(_thManager);
         }
-        public GroupOfSchedule()
-        {
-            _thManager = new ThreadManager();
-            _helper = new ScheduleParser(_thManager);
-        }
+        //public GroupOfSchedule() { }
         public string GroupName { get; set; }
         public List<Schedule> Schedules { get; private set; }
         public List<GroupOfSchedule> Subgroups { get; private set; }
@@ -67,8 +56,7 @@ namespace ParseHelper
             }
         }
 
-        public void ToSubgroup(string subName, Regex filter, NodeType assignedType) => CreateSubgroup(subName, filter, assignedType);
-        private GroupOfSchedule CreateSubgroup(string subName, Regex filter, NodeType assignedType)
+        public GroupOfSchedule CreateSubgroup(string subName, Regex filter, NodeType assignedType)
         {
             if (Subgroups == null) Subgroups = new List<GroupOfSchedule>();
 
@@ -86,68 +74,11 @@ namespace ParseHelper
             if (Schedules.Count == 0) Schedules = null;
             return currentGroup;
         }
-        public void ToSubgroupsTree(GroupFilter filters) => CreateSubgroupsTree(this, filters);
-        private static void CreateSubgroupsTree(GroupOfSchedule group, GroupFilter filters)
-        {
-            if (filters.Filter != null)
-                if (group.Schedules != null)
-                    if (group.Schedules.Any(t => filters.Filter.IsMatch(t.Name) && t.GetNodeType() == filters.AssignType))
-                        group = group.CreateSubgroup(filters.GroupName, filters.Filter, filters.AssignType);
 
-            if (filters.SubFilters != null)
-                foreach (var filtersSubFilter in filters.SubFilters)
-                {
-                    CreateSubgroupsTree(group, filtersSubFilter);
-                }
-        }
+        //todo obsolete vvv
         //todo убрать методы loadschedules u loadauditoriums из groupedSchedule в parseHelper скорее всего в синк раздел, и очистить этот раздел от старых и неэффективных методов, которые только затрудняют ориентирование внутри проекта
         //todo создать раздел коммон для самых простых, общих и часто используемых методов, перетащить туда  ToAuditorySchedules вместе со всем что сейчас в корневом разделе
-        public void LoadSchedules(IEnumerable<Source> sources)
-        {
-            var loadedSchedules = new List<Schedule>();
-
-            _thManager.Wait(() =>
-            {
-                foreach (var source in sources)
-                {
-                    _helper.Async.FillTableRecurcieveAsync(source.WebLink, source.LinkType, loadedSchedules);
-                }
-            });
-
-            if (Schedules == null) Schedules = new List<Schedule>();
-            Schedules.AddRange(_helper.RemoveRepeats(loadedSchedules));
-        }
-
-        public void LoadAsAuditoriums(IEnumerable<Source> sources)
-        {
-            var loadedSchedules = new List<Schedule>();
-            foreach (var source in sources)
-            {
-                var res = new List<Schedule>();
-                _thManager.Wait(() => { _helper.Async.FillTableRecurcieveAsync(source.WebLink, source.LinkType, res); });
-                loadedSchedules.AddRange(res);
-            }
-            //foreach (var source in sources)
-            //{
-            //    loadedSchedules.AddRange(_helper.FillTableRecurcieveAsyncAndWait(source.WebLink, source.LinkType));
-            //}
-
-            if (Schedules == null) Schedules = new List<Schedule>();
-            Schedules.AddRange(_helper.Sync.ToAuditorySchedules(_helper.RemoveRepeats(loadedSchedules)));
-        }
-        public void ToAuditoriums(IEnumerable<Schedule> sources)
-        {
-            if (Schedules == null) Schedules = new List<Schedule>();
-            Schedules.AddRange(_helper.Sync.ToAuditorySchedules(sources));
-        }
-
-        public ScheduleParser GetHelper()
-        {
-            return _helper;
-        }
-        /// <summary>
-        /// Work In Progress
-        /// </summary>
+   
         public static GroupFilter DefaultFilters { get; }
 
         static GroupOfSchedule()
