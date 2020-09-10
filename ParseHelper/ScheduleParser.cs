@@ -23,6 +23,7 @@ namespace ParseHelper
             Async = new AsyncMethods(this);
             Grouping = new GroupingMethods(this);
             Common = new CommonMethods(this);
+            FireBase = new FireBaseMethods(this);
         }
 
         public delegate void GerLinksDelegate(string tableLink, string tableData);
