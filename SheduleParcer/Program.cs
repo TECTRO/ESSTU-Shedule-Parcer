@@ -23,10 +23,14 @@ namespace SheduleParcer
         //=================================================
         static void Main(string[] args)
         {
+
             ThreadManager.UseDebugger = true;
           
             ScheduleParser mainScheduleParser = new ScheduleParser(new ThreadManager());
+     //v                  mainScheduleParser.Grouping.DefaultLoadSchedules(ScheduleParser.GroupingMethods.DefaultLoadingStructs);
 
+            var loaded =  mainScheduleParser.Grouping.DefaultLoadSchedules(ScheduleParser.GroupingMethods.DefaultLoadingStructs);
+     
 
             #region asNewFutureMethod
 

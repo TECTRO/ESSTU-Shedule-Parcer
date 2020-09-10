@@ -87,27 +87,31 @@ namespace ParseHelper
             {
                 new GroupFilter("Корпуса",new Regex(@"(?<audit>\d*-?\w*-?\w*)"),NodeType.Auditory, new []
                 {
-                    new GroupFilter("Корпус 1",new Regex("^1.*"),NodeType.Auditory,null ),
-                    new GroupFilter("Корпус 2",new Regex("^2.*"),NodeType.Auditory,null ),
-                    new GroupFilter("Корпус 3",new Regex("^3.*"),NodeType.Auditory,null ),
-                    new GroupFilter("Корпус 4",new Regex("^4.*"),NodeType.Auditory,null ),
-                    new GroupFilter("Корпус 5",new Regex("^5.*"),NodeType.Auditory,null ),
-                    new GroupFilter("Корпус 6",new Regex("^6.*"),NodeType.Auditory,null ),
-                    new GroupFilter("Корпус 7",new Regex("^7.*"),NodeType.Auditory,null ),
-                    new GroupFilter("Корпус 8",new Regex("^8.*"),NodeType.Auditory,null ),
-                    new GroupFilter("Корпус 9",new Regex("^9.*"),NodeType.Auditory,null ),
-                    new GroupFilter("Корпус 10",new Regex("^0.*"),NodeType.Auditory,null ),
-                    new GroupFilter("Корпус 11",new Regex("^11-.*"),NodeType.Auditory,null ),
-                    new GroupFilter("Корпус 12",new Regex("^12-.*"),NodeType.Auditory,null ),
-                    new GroupFilter("Корпус 13",new Regex("^13-.*"),NodeType.Auditory,null ),
-                    new GroupFilter("Корпус 14",new Regex("^14-.*"),NodeType.Auditory,null ),
-                    new GroupFilter("Корпус 15",new Regex("^15-.*"),NodeType.Auditory,null ),
-                    new GroupFilter("Корпус 16",new Regex("^16-.*"),NodeType.Auditory,null ),
-                    new GroupFilter("Корпус 17",new Regex("^17-.*"),NodeType.Auditory,null ),
-                    new GroupFilter("Корпус 18",new Regex("^18-.*"),NodeType.Auditory,null ),
-                    new GroupFilter("Корпус 19",new Regex("^19-.*"),NodeType.Auditory,null ),
-                    new GroupFilter("Корпус 20",new Regex("^20-.*"),NodeType.Auditory,null ),
-                    new GroupFilter("Корпус 21",new Regex("^21-.*"),NodeType.Auditory,null )
+                    new GroupFilter("Корпус 24", new Regex("^24-.*"), NodeType.Auditory, null),
+                    new GroupFilter("Корпус 23", new Regex("^23-.*"), NodeType.Auditory, null),
+                    new GroupFilter("Корпус 22", new Regex("^22-.*"), NodeType.Auditory, null),
+                    new GroupFilter("Корпус 21", new Regex("^21-.*"), NodeType.Auditory, null),
+                    new GroupFilter("Корпус 20", new Regex("^20-.*"), NodeType.Auditory, null),
+                    new GroupFilter("Корпус 19", new Regex("^19-.*"), NodeType.Auditory, null),
+                    new GroupFilter("Корпус 18", new Regex("^18-.*"), NodeType.Auditory, null),
+                    new GroupFilter("Корпус 17", new Regex("^17-.*"), NodeType.Auditory, null),
+                    new GroupFilter("Корпус 16", new Regex("^16-.*"), NodeType.Auditory, null),
+                    new GroupFilter("Корпус 15", new Regex("^15-.*"), NodeType.Auditory, null),
+                    new GroupFilter("Корпус 14", new Regex("^14-.*"), NodeType.Auditory, null),
+                    new GroupFilter("Корпус 13", new Regex("^13-.*"), NodeType.Auditory, null),
+                    new GroupFilter("Корпус 12", new Regex("^12-.*"), NodeType.Auditory, null),
+                    new GroupFilter("Корпус 11", new Regex("^11-.*"), NodeType.Auditory, null),
+                    new GroupFilter("Корпус 10", new Regex("^0.*"), NodeType.Auditory, null),
+                    new GroupFilter("Корпус 9", new Regex("^9.*"), NodeType.Auditory, null),
+                    new GroupFilter("Корпус 8", new Regex("^8.*"), NodeType.Auditory, null),
+                    new GroupFilter("Корпус 7", new Regex("^7.*"), NodeType.Auditory, null),
+                    new GroupFilter("Корпус 6", new Regex("^6.*"), NodeType.Auditory, null),
+                    new GroupFilter("Корпус 5", new Regex("^5.*"), NodeType.Auditory, null),
+                    new GroupFilter("Корпус 4", new Regex("^4.*"), NodeType.Auditory, null),
+                    new GroupFilter("Корпус 3", new Regex("^3.*"), NodeType.Auditory, null),
+                    new GroupFilter("Корпус 2", new Regex("^2.*"), NodeType.Auditory, null),
+                    new GroupFilter("Корпус 1", new Regex("^1.*"), NodeType.Auditory, null)
+                    
                 }),
                 new GroupFilter("Студенты", ScheduleParser.Group,NodeType.Student, new []
                 {
@@ -148,6 +152,10 @@ namespace ParseHelper
             return TablesList.Select(t => t.ConvertToTable());
         }
 
+        public override string ToString()
+        {
+            return Name+" "+ TablesList.Count;
+        }
         public class ScheduleTable
         {
             public Week SelectedWeek { get; set; }

@@ -8,6 +8,41 @@ namespace ParseHelper
 {
     public static class Extender
     {
+        public static NodeType GetNodeType(this Node node)
+        {
+            Type typeOfNode = node.GetType();
+
+            if (typeOfNode == typeof(PrepNode))
+                return NodeType.Teacher;
+            if (typeOfNode == typeof(StNode))
+                return NodeType.Student;
+            if (typeOfNode == typeof(AuditoryNode))
+                return NodeType.Auditory;
+            return NodeType.Error;
+        }
+        public static IEnumerable<NodeType> GetNodeTypes(this IEnumerable<Node> node)
+        {
+            return node.Select(t => t.GetNodeType()).Distinct();
+        }
+        public static IEnumerable<NodeType> GetNodeTypes(this IEnumerable<Schedule.ScheduleTable> scheduleTables)
+        {
+            List<NodeType> nodeTypes = new List<NodeType>();
+
+            foreach (var scheduleTable in scheduleTables)
+                nodeTypes.AddRange(scheduleTable.LectionList.GetNodeTypes());
+
+            return nodeTypes.Distinct();
+        }
+        public static IEnumerable<NodeType> GetNodeTypes(this IEnumerable<Schedule> schedules)
+        {
+            List<NodeType> nodeTypes = new List<NodeType>();
+
+            foreach (var schedule in schedules)
+                nodeTypes.AddRange(schedule.TablesList.GetNodeTypes());
+
+            return nodeTypes.Distinct();
+        }
+
         public static string ToString(this List<Node> lectionList, char separator)
         {
             string result = string.Empty;
